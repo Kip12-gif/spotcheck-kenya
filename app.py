@@ -4,23 +4,26 @@ import pandas as pd
 import streamlit as st
 from streamlit_folium import st_folium
 from streamlit_js_eval import get_geolocation
+from PIL import Image
+import io
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
-    page_title="SpotCheck Kenya | Travel & Corridor Navigator",
+    page_title="SpotCheck Kenya | Travel & Scenic Navigator",
     page_icon="🦁",
     layout="wide",
 )
 
-# --- SAFARI THEME & HIGH-CONTRAST VISUALS ---
+# --- VIBRANT TOURISM DESIGN & HIGH-CONTRAST VISUALS ---
 st.markdown(
     """
     <style>
-    /* Full App Background with Safari Atmosphere Overlay */
+    /* Full App Background with Warm African Sunset Theme */
     .stApp {
         background: linear-gradient(
-            rgba(255, 255, 255, 0.88), 
-            rgba(245, 240, 230, 0.92)
+            135deg, 
+            rgba(255, 248, 240, 0.93), 
+            rgba(254, 237, 213, 0.95)
         ), 
         url('https://images.unsplash.com/photo-1516426122078-c23e76319801?q=80&w=1920');
         background-size: cover;
@@ -28,55 +31,102 @@ st.markdown(
         background-attachment: fixed;
     }
 
-    /* Global Typography & Contrast */
+    /* Global Typography & Elements */
     body, p, div, span, label {
-        color: #1F2937 !important;
-        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        color: #1A1A1A !important;
+        font-family: 'Poppins', 'Segoe UI', Roboto, sans-serif;
     }
 
-    /* Vibrant Main Header */
-    .main-title {
-        font-size: 2.6rem;
+    /* Vibrant Safari Main Header */
+    .hero-banner {
+        background: linear-gradient(115deg, #C2410C, #EA580C, #D97706);
+        padding: 24px;
+        border-radius: 16px;
+        box-shadow: 0 8px 20px rgba(194, 65, 12, 0.25);
+        color: white !important;
+        margin-bottom: 20px;
+    }
+    
+    .hero-banner h1 {
+        color: #FFFFFF !important;
+        font-size: 2.8rem;
         font-weight: 800;
-        color: #9A3412;
-        margin-bottom: 2px;
+        margin: 0;
         letter-spacing: -0.5px;
     }
     
-    .sub-title {
-        font-size: 1.05rem;
-        color: #4B5563;
+    .hero-banner p {
+        color: #FEF3C7 !important;
+        font-size: 1.15rem;
         font-weight: 500;
-        margin-bottom: 1.5rem;
+        margin-top: 5px;
+        margin-bottom: 0;
     }
 
-    /* Content Containers & Cards */
-    .stMetric, div[data-testid="stExpander"] {
-        background-color: rgba(255, 255, 255, 0.95) !important;
-        border-radius: 10px !important;
-        border: 1px solid #D1D5DB !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
-    }
-
+    /* Cards & Containers */
     .description-card {
-        background-color: rgba(255, 255, 255, 0.95);
+        background: #FFFFFF;
+        padding: 16px;
+        border-radius: 12px;
+        border-left: 6px solid #D97706;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        margin-top: 12px;
+        margin-bottom: 16px;
+        font-size: 0.98rem;
+        line-height: 1.6;
+    }
+
+    .location-box {
+        background-color: #FEF3C7;
+        border: 2px dashed #D97706;
+        border-radius: 10px;
         padding: 14px;
-        border-radius: 8px;
-        border-left: 4px solid #EA580C;
-        margin-top: 10px;
-        margin-bottom: 15px;
-        font-size: 0.95rem;
-        line-height: 1.5;
-        color: #374151 !important;
+        margin-bottom: 20px;
+    }
+
+    .badge-category {
+        background-color: #15803D;
+        color: white !important;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+
+    .badge-route {
+        background-color: #C2410C;
+        color: white !important;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-block;
     }
 
     .insight-card {
         background-color: #FFFFFF;
-        padding: 12px;
-        border-radius: 8px;
-        border-left: 4px solid #C2410C;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-        margin-bottom: 10px;
+        padding: 14px;
+        border-radius: 10px;
+        border-left: 5px solid #059669;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.05);
+        margin-bottom: 12px;
+    }
+
+    /* Button Customization */
+    .stButton>button {
+        background: linear-gradient(90deg, #EA580C, #D97706) !important;
+        color: white !important;
+        font-weight: 700 !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 8px 16px !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(234, 88, 12, 0.35) !important;
     }
     </style>
 """,
@@ -99,7 +149,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 
-# --- DETAILED KENYA SPOTS DATASET ---
+# --- INITIAL KENYA SPOTS DATASET ---
 def get_initial_spots():
     return [
         {
@@ -110,7 +160,9 @@ def get_initial_spots():
             "route": "Nairobi - Naivasha Highway (A104)",
             "county": "Nakuru",
             "description": "Perched on the edge of the Gregory Rift escarpment, this iconic stop offers panoramic views across the vast Rift Valley floor toward Mount Longonot and Lake Naivasha.",
-            "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Great_Rift_Valley_Kenya.jpg/800px-Great_Rift_Valley_Kenya.jpg",
+            "images": [
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Great_Rift_Valley_Kenya.jpg/800px-Great_Rift_Valley_Kenya.jpg"
+            ],
         },
         {
             "name": "Hell's Gate National Park & Gorge",
@@ -120,17 +172,9 @@ def get_initial_spots():
             "route": "Nairobi - Naivasha Highway (A104)",
             "county": "Nakuru",
             "description": "Famous for towering red cliffs, geothermal steam plumes, and Ol Njorowa Gorge. Visitors can cycle or hike right alongside zebras, giraffes, and gazelles.",
-            "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Hells_Gate_National_Park_Gorge_2.jpg/800px-Hells_Gate_National_Park_Gorge_2.jpg",
-        },
-        {
-            "name": "Menengai Crater Viewpoint",
-            "lat": -0.2000,
-            "lon": 36.0667,
-            "category": "Volcanic Crater / Viewpoint",
-            "route": "Nairobi - Naivasha Highway (A104)",
-            "county": "Nakuru",
-            "description": "One of the largest intact volcanic calderas in the world. The viewpoint offers views over the caldera floor covered in dense forest and active geothermal vents.",
-            "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Menengai_Crater.jpg/800px-Menengai_Crater.jpg",
+            "images": [
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Hells_Gate_National_Park_Gorge_2.jpg/800px-Hells_Gate_National_Park_Gorge_2.jpg"
+            ],
         },
         {
             "name": "Iten High Altitude Rim Viewpoint",
@@ -139,8 +183,10 @@ def get_initial_spots():
             "category": "Scenic Viewpoint / Athletics",
             "route": "Eldoret - Iten Road (C51)",
             "county": "Elgeyo Marakwet",
-            "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Iten_Kenya.jpg/800px-Iten_Kenya.jpg",
             "description": "Located at 2,400m above sea level along the Elgeyo Escarpment, Iten is the global training capital for elite marathon runners, featuring views dropping into the Kerio Valley.",
+            "images": [
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Iten_Kenya.jpg/800px-Iten_Kenya.jpg"
+            ],
         },
         {
             "name": "Torok Waterfall",
@@ -150,7 +196,9 @@ def get_initial_spots():
             "route": "Eldoret - Iten Road (C51)",
             "county": "Elgeyo Marakwet",
             "description": "A magnificent 150-meter cascade tumbling down the sheer red face of the Elgeyo Escarpment, accessed via scenic hiking trails through indigenous flora.",
-            "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Kenya_waterfall.jpg/800px-Kenya_waterfall.jpg",
+            "images": [
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Kenya_waterfall.jpg/800px-Kenya_waterfall.jpg"
+            ],
         },
         {
             "name": "Ngare Ndare Forest Canopy Walk",
@@ -160,32 +208,14 @@ def get_initial_spots():
             "route": "Nairobi - Nanyuki Highway (A2)",
             "county": "Meru / Laikipia",
             "description": "An indigenous forest featuring a 450-meter elevated canopy walk suspended among ancient trees, leading to crystal-clear blue glacial pools fed by Mount Kenya.",
-            "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Ngare_Ndare_Forest_Canopy_Walk.jpg/800px-Ngare_Ndare_Forest_Canopy_Walk.jpg",
-        },
-        {
-            "name": "Thomson's Falls (Nyahururu)",
-            "lat": 0.0441,
-            "lon": 36.3686,
-            "category": "Waterfall Hike",
-            "route": "Nyeri - Nyahururu Road (B21)",
-            "county": "Laikipia",
-            "description": "A 74-meter waterfall on the Ewaso Nyiro River on the equator, surrounded by lush mist forest and scenic viewing platforms.",
-            "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Thomson%27s_Falls.jpg/800px-Thomson%27s_Falls.jpg",
-        },
-        {
-            "name": "Lake Magadi Hot Springs",
-            "lat": -1.9000,
-            "lon": 36.2833,
-            "category": "Hot Springs",
-            "route": "Kajiado - Magadi Road",
-            "county": "Kajiado",
-            "description": "Natural geothermal springs rich in minerals located at the southernmost soda lake in Kenya's Rift Valley, set against dramatic alkaline salt pans.",
-            "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Lake_Magadi.jpg/800px-Lake_Magadi.jpg",
+            "images": [
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Ngare_Ndare_Forest_Canopy_Walk.jpg/800px-Ngare_Ndare_Forest_Canopy_Walk.jpg"
+            ],
         },
     ]
 
 
-# Initialize Datasets in Session State
+# Initialize Session States
 if "spots_data" not in st.session_state:
     st.session_state["spots_data"] = get_initial_spots()
 
@@ -198,14 +228,84 @@ if "user_insights" not in st.session_state:
         }
     ]
 
-# --- APP HEADER ---
+# Default User Origin: Nairobi CBD
+if "user_lat" not in st.session_state:
+    st.session_state["user_lat"] = -1.286389
+if "user_lon" not in st.session_state:
+    st.session_state["user_lon"] = 36.817223
+if "location_source" not in st.session_state:
+    st.session_state["location_source"] = "Default Reference (Nairobi CBD)"
+
+# --- HERO HEADER ---
 st.markdown(
-    '<div class="main-title">🦁 SpotCheck Kenya</div>', unsafe_allow_html=True
-)
-st.markdown(
-    '<div class="sub-title">Travel Corridor Navigator, Scenic Maps & Field Insights</div>',
+    """
+    <div class="hero-banner">
+        <h1>🦁 SpotCheck Kenya</h1>
+        <p>Explore Travel Corridors, Scenic Viewpoints & Field Insights Across Kenya</p>
+    </div>
+    """,
     unsafe_allow_html=True,
 )
+
+# --- EXPLICIT GEOLOCATION PERMISSION SECTION ---
+with st.container():
+    st.markdown('<div class="location-box">', unsafe_allow_html=True)
+    st.subheader("📍 Origin & Live Distance Setup")
+
+    loc_col1, loc_col2 = st.columns([1.2, 1])
+
+    with loc_col1:
+        st.write(f"**Current Reference Origin:** `{st.session_state['location_source']}`")
+        st.write(
+            f"Coordinates: `{st.session_state['user_lat']:.4f}, {st.session_state['user_lon']:.4f}`"
+        )
+
+        st.markdown("**Request Live GPS Location:**")
+        st.info("Click the button below to prompt your browser for location permission.")
+
+        # Interactive button triggering browser GPS access
+        if st.button("📡 Detect My Current Location"):
+            loc = get_geolocation()
+            if loc and "coords" in loc:
+                st.session_state["user_lat"] = loc["coords"]["latitude"]
+                st.session_state["user_lon"] = loc["coords"]["longitude"]
+                st.session_state["location_source"] = "Live Device GPS"
+                st.success("Location acquired successfully!")
+                st.rerun()
+            else:
+                st.warning(
+                    "Location request sent. Please allow browser location access if prompted."
+                )
+
+    with loc_col2:
+        st.markdown("**Or Set Manual Origin Point:**")
+        manual_city = st.selectbox(
+            "Select Reference Town/City:",
+            [
+                "Nairobi CBD (-1.2864, 36.8172)",
+                "Eldoret Town (0.5143, 35.2698)",
+                "Nakuru City (-0.3031, 36.0800)",
+                "Nanyuki Town (0.0167, 37.0728)",
+                "Mombasa CBD (-4.0435, 39.6682)",
+            ],
+        )
+
+        if st.button("Set Selected City as Origin"):
+            coords_map = {
+                "Nairobi CBD (-1.2864, 36.8172)": (-1.286389, 36.817223),
+                "Eldoret Town (0.5143, 35.2698)": (0.5143, 35.2698),
+                "Nakuru City (-0.3031, 36.0800)": (-0.3031, 36.0800),
+                "Nanyuki Town (0.0167, 37.0728)": (0.0167, 37.0728),
+                "Mombasa CBD (-4.0435, 39.6682)": (-4.0435, 39.6682),
+            }
+            c = coords_map[manual_city]
+            st.session_state["user_lat"] = c[0]
+            st.session_state["user_lon"] = c[1]
+            st.session_state["location_source"] = manual_city.split(" (")[0]
+            st.success(f"Origin set to {st.session_state['location_source']}")
+            st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 df_all = pd.DataFrame(st.session_state["spots_data"])
 
@@ -240,19 +340,14 @@ mode_speeds = {
     "Airplane (Direct)": {"speed": 500, "gmaps_mode": "driving"},
 }
 
-# --- SILENT GEOLOCATION FETCH ---
-loc = get_geolocation()
-user_lat, user_lon = -1.286389, 36.817223  # Internal Reference: Nairobi CBD
-
-if loc and "coords" in loc:
-    user_lat = loc["coords"]["latitude"]
-    user_lon = loc["coords"]["longitude"]
-
-# Calculate Distances
+# Distance Computations
 if not df.empty:
     df["Distance_km"] = df.apply(
         lambda row: haversine_distance(
-            user_lat, user_lon, row["lat"], row["lon"]
+            st.session_state["user_lat"],
+            st.session_state["user_lon"],
+            row["lat"],
+            row["lon"],
         ),
         axis=1,
     )
@@ -266,26 +361,52 @@ st.markdown("---")
 if df.empty:
     st.info("No spots match the current corridor filters.")
 else:
-    col1, col2 = st.columns([1, 1.1])
+    col1, col2 = st.columns([1.1, 1])
 
     with col1:
         st.subheader("🏁 Destination Overview")
 
         selected_spot_name = st.selectbox(
-            "Select destination spot:", df["name"]
+            "Select Destination Spot:", df["name"]
         )
-        spot = df[df["name"] == selected_spot_name].iloc[0]
-
-        # Destination Image
-        st.image(
-            spot["image_url"],
-            caption=f"{spot['name']} — {spot['county']} County",
-            use_container_width=True,
+        spot_idx = next(
+            i
+            for i, item in enumerate(st.session_state["spots_data"])
+            if item["name"] == selected_spot_name
         )
+        spot = st.session_state["spots_data"][spot_idx]
 
-        # Place Description Box
+        # Calculate specific distance for selected spot
+        spot_dist = haversine_distance(
+            st.session_state["user_lat"],
+            st.session_state["user_lon"],
+            spot["lat"],
+            spot["lon"],
+        )
+        spot_eta = spot_dist / mode_speeds[mode]["speed"]
+
+        # Display Image Gallery
+        images = spot.get("images", [])
+        if images:
+            st.image(
+                images[0],
+                caption=f"{spot['name']} — {spot['county']} County",
+                use_container_width=True,
+            )
+            if len(images) > 1:
+                st.write("**Additional Photos:**")
+                sub_cols = st.columns(min(len(images) - 1, 3))
+                for idx, extra_img in enumerate(images[1:]):
+                    with sub_cols[idx % 3]:
+                        st.image(extra_img, use_container_width=True)
+
+        # Place Description & Badges
         st.markdown(
             f"""
+            <div style="margin-top: 10px; margin-bottom: 10px;">
+                <span class="badge-category">{spot['category']}</span>
+                <span class="badge-route">{spot['route']}</span>
+            </div>
             <div class="description-card">
                 <b>About this Location:</b><br>
                 {spot['description']}
@@ -294,31 +415,47 @@ else:
             unsafe_allow_html=True,
         )
 
-        st.markdown(
-            f"**Category:** `{spot['category']}` | **Corridor:** `{spot['route']}`"
-        )
+        # Upload image to EXISTING spot
+        with st.expander("📷 Add a new photo to this destination"):
+            existing_upload = st.file_uploader(
+                "Upload a photo taken at this spot:",
+                type=["jpg", "jpeg", "png"],
+                key="existing_upload",
+            )
+            if existing_upload:
+                img_bytes = existing_upload.read()
+                image = Image.open(io.BytesIO(img_bytes))
+                st.image(image, caption="Preview Upload", width=200)
+
+                if st.button("Save Photo to Spot"):
+                    # Save as PIL Image directly to session
+                    st.session_state["spots_data"][spot_idx]["images"].append(
+                        image
+                    )
+                    st.success("Photo added to spot gallery!")
+                    st.rerun()
 
         # Distance & ETA Metric
         st.metric(
-            label=f"Calculated Distance ({mode})",
-            value=f"{spot['Distance_km']:.1f} km",
+            label=f"Calculated Distance from {st.session_state['location_source']} ({mode})",
+            value=f"{spot_dist:.1f} km",
             delta=(
-                f"~{spot['ETA_hours']*60:.0f} mins ETA"
-                if spot["ETA_hours"] < 1
-                else f"~{spot['ETA_hours']:.1f} hrs ETA"
+                f"~{spot_eta*60:.0f} mins ETA"
+                if spot_eta < 1
+                else f"~{spot_eta:.1f} hrs ETA"
             ),
         )
 
-        # Direct Google Navigation Link
+        # Google Maps Navigation
         gmaps_mode = mode_speeds[mode]["gmaps_mode"]
-        gmaps_url = f"https://www.google.com/maps/dir/?api=1&origin={user_lat},{user_lon}&destination={spot['lat']},{spot['lon']}&travelmode={gmaps_mode}"
-        st.link_button("🚗 Navigate via Google Maps", gmaps_url)
+        gmaps_url = f"https://www.google.com/maps/dir/?api=1&origin={st.session_state['user_lat']},{st.session_state['user_lon']}&destination={spot['lat']},{spot['lon']}&travelmode={gmaps_mode}"
+        st.link_button("🚗 Open Route in Google Maps", gmaps_url)
 
     with col2:
-        st.subheader("🗺️ Location & Route Map")
+        st.subheader("🗺️ Location & Navigation Map")
 
-        center_lat = (user_lat + spot["lat"]) / 2
-        center_lon = (user_lon + spot["lon"]) / 2
+        center_lat = (st.session_state["user_lat"] + spot["lat"]) / 2
+        center_lon = (st.session_state["user_lon"] + spot["lon"]) / 2
 
         m = folium.Map(
             location=[center_lat, center_lon],
@@ -328,18 +465,21 @@ else:
 
         # Origin Marker
         folium.Marker(
-            location=[user_lat, user_lon],
-            popup="Origin Point",
+            location=[
+                st.session_state["user_lat"],
+                st.session_state["user_lon"],
+            ],
+            popup=f"Origin: {st.session_state['location_source']}",
             tooltip="Origin",
             icon=folium.Icon(color="red", icon="user", prefix="fa"),
         ).add_to(m)
 
-        # Destination Marker with Rich Popup Image & Description
+        # Destination Marker
+        cover_img = images[0] if images else ""
         popup_html = f"""
         <div style='width:220px;'>
             <b>{spot['name']}</b><br>
             <i style='font-size:0.85rem; color:#555;'>{spot['county']} County</i><br><br>
-            <img src='{spot['image_url']}' width='100%' style='border-radius:4px;'><br><br>
             <p style='font-size:0.85rem;'>{spot['description'][:100]}...</p>
         </div>
         """
@@ -351,26 +491,29 @@ else:
             icon=folium.Icon(color="green", icon="star", prefix="fa"),
         ).add_to(m)
 
-        # Route Line
+        # Polyline connecting route
         folium.PolyLine(
-            locations=[[user_lat, user_lon], [spot["lat"], spot["lon"]]],
+            locations=[
+                [st.session_state["user_lat"], st.session_state["user_lon"]],
+                [spot["lat"], spot["lon"]],
+            ],
             color="#EA580C",
             weight=4,
             opacity=0.85,
         ).add_to(m)
 
-        st_folium(m, width="100%", height=460, returned_objects=[])
+        st_folium(m, width="100%", height=520, returned_objects=[])
 
-# --- COMMUNITY SECTION ---
+# --- COMMUNITY & ADD LOCATION TABS ---
 st.markdown("---")
 
 tab1, tab2 = st.tabs(
-    ["💬 Traveler Tips & Field Insights", "➕ Add a New Location"]
+    ["💬 Traveler Insights", "➕ Add New Destination with Image"]
 )
 
 with tab1:
     if not df.empty:
-        st.markdown(f"#### Shared Experiences for **{spot['name']}**")
+        st.markdown(f"#### Community Tips for **{spot['name']}**")
         matching_insights = [
             i
             for i in st.session_state["user_insights"]
@@ -391,10 +534,10 @@ with tab1:
         else:
             st.write("No community tips posted for this spot yet.")
 
-        # Tip Submission Form
+        # Post Tip Form
         with st.form("add_tip_form", clear_on_submit=True):
             author_name = st.text_input(
-                "Your Name / Handle:", placeholder="e.g., Traveler_254"
+                "Your Name / Handle:", placeholder="e.g., Marathoner_Elgeyo"
             )
             user_tip = st.text_area(
                 "Share road conditions, scenic stop advice, or tips:"
@@ -408,28 +551,28 @@ with tab1:
                             "insight": user_tip.strip(),
                         }
                     )
-                    st.success("Tip added!")
+                    st.success("Tip added successfully!")
                     st.rerun()
 
 with tab2:
-    st.markdown("#### Add a New Highway Spot to SpotCheck")
+    st.markdown("#### Add a Brand New Location")
 
     with st.form("add_spot_form", clear_on_submit=True):
         new_name = st.text_input(
-            "Location Name", placeholder="e.g., Kerio Valley Viewpoint"
+            "Location Name", placeholder="e.g., Chepkiit Waterfalls"
         )
         new_desc = st.text_area(
             "Place Description",
-            placeholder="Provide details about what makes this place special...",
+            placeholder="Describe what makes this location worth visiting...",
         )
 
         col_a, col_b = st.columns(2)
         with col_a:
             new_lat = st.number_input(
-                "Latitude", value=0.6728, format="%.4f"
+                "Latitude", value=0.5167, format="%.4f"
             )
             new_county = st.text_input(
-                "County", placeholder="e.g., Elgeyo Marakwet"
+                "County", placeholder="e.g., Nandi County"
             )
             new_category = st.selectbox(
                 "Category",
@@ -445,21 +588,37 @@ with tab2:
 
         with col_b:
             new_lon = st.number_input(
-                "Longitude", value=35.5081, format="%.4f"
+                "Longitude", value=35.1833, format="%.4f"
             )
             new_route = st.text_input(
                 "Highway / Corridor",
-                placeholder="e.g., Eldoret - Iten Road (C51)",
+                placeholder="e.g., Eldoret - Kapsabet Road (C39)",
             )
-            new_img = st.text_input(
-                "Image URL",
-                value="https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Iten_Kenya.jpg/800px-Iten_Kenya.jpg",
+            new_img_file = st.file_uploader(
+                "Upload Image File:", type=["jpg", "jpeg", "png"]
+            )
+            new_img_url = st.text_input(
+                "Or Provide Image URL:",
+                placeholder="https://example.com/image.jpg",
             )
 
-        submit_spot = st.form_submit_button("Submit Location")
+        submit_spot = st.form_submit_button("Add Destination")
 
         if submit_spot:
             if new_name.strip() and new_route.strip() and new_desc.strip():
+                images_list = []
+
+                if new_img_file is not None:
+                    img_bytes = new_img_file.read()
+                    uploaded_image = Image.open(io.BytesIO(img_bytes))
+                    images_list.append(uploaded_image)
+                elif new_img_url.strip():
+                    images_list.append(new_img_url.strip())
+                else:
+                    images_list.append(
+                        "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Iten_Kenya.jpg/800px-Iten_Kenya.jpg"
+                    )
+
                 new_spot_entry = {
                     "name": new_name.strip(),
                     "lat": float(new_lat),
@@ -468,10 +627,10 @@ with tab2:
                     "route": new_route.strip(),
                     "county": new_county.strip(),
                     "description": new_desc.strip(),
-                    "image_url": new_img.strip(),
+                    "images": images_list,
                 }
                 st.session_state["spots_data"].append(new_spot_entry)
-                st.success(f"'{new_name}' added to the map dataset!")
+                st.success(f"'{new_name}' added to destination map!")
                 st.rerun()
             else:
                 st.error(
