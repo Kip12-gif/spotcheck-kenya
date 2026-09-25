@@ -1,115 +1,225 @@
-
 import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
-import os
+import math
 
-# Set Streamlit layout
-st.set_page_config(page_title="SpotCheck Kenya", page_icon="📍", layout="wide")
+# --- PAGE CONFIGURATION ---
+st.set_page_config(
+    page_title="SpotCheck Kenya | Real-Time Navigation",
+    page_icon="📍",
+    layout="wide"
+)
+
+# --- HAVERSINE DISTANCE CALCULATOR ---
+def haversine_distance(lat1, lon1, lat2, lon2):
+    R = 6371.0  # Earth radius in km
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) ** 2 + 
+         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+# --- DATASET WITH SITE IMAGE URLS ---
+@st.cache_data
+def load_data():
+    data = [
+        {
+            "name": "Mai Mahiu Rift Valley Viewpoint", 
+            "lat": -1.0858, 
+            "lon": 36.5772, 
+            "category": "Scenic Viewpoint", 
+            "route": "Nairobi-Naivasha (A104)", 
+            "county": "Nakuru",
+            "image_url": "https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?auto=format&fit=crop&w=800&q=80"
+        },
+        {
+            "name": "Hell's Gate National Park", 
+            "lat": -0.8872, 
+            "lon": 36.3153, 
+            "category": "National Park / Gorge", 
+            "route": "Nairobi-Naivasha (A104)", 
+            "county": "Nakuru",
+            "image_url": "https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=800&q=80"
+        },
+        {
+            "name": "Iten High Altitude Rim Viewpoint", 
+            "lat": 0.6728, 
+            "lon": 35.5081, 
+            "category": "Scenic Viewpoint", 
+            "route": "Eldoret-Iten (C51)", 
+            "county": "Elgeyo Marakwet",
+            "image_url": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80"
+        },
+        {
+            "name": "Torok Waterfall", 
+            "lat": 0.4333, 
+            "lon": 35.5333, 
+            "category": "Waterfall Hike", 
+            "route": "Eldoret-Iten (C51)", 
+            "county": "Elgeyo Marakwet",
+            "image_url": "https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=800&q=80"
+        },
+        {
+            "name": "Ngare Ndare Canopy Walk", 
+            "lat": 0.2833, 
+            "lon": 37.3500, 
+            "category": "Forest / Canopy", 
+            "route": "Nairobi-Nanyuki (A2)", 
+            "county": "Meru / Laikipia",
+            "image_url": "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=800&q=80"
+        },
+        {
+            "name": "Lake Magadi Hot Springs", 
+            "lat": -1.9000, 
+            "lon": 36.2833, 
+            "category": "Hot Springs", 
+            "route": "Kajiado-Magadi", 
+            "county": "Kajiado",
+            "image_url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80"
+        },
+    ]
+    return pd.DataFrame(data)
+
+df = load_data()
 
 st.title("📍 SpotCheck Kenya")
-st.caption("Curated Road Trip Corridors, Hidden Gems & Stopovers across Kenya")
+st.caption("Interactive Road Trip Corridors, Distance Matrix & Voice-Assisted Navigation")
 
-DATA_FILE = "kenya_spots.csv"
+# --- SIDEBAR CONTROLS ---
+st.sidebar.header("⚙️ Navigation Setup")
 
-@st.cache_data
-def load_spots():
-    if os.path.exists(DATA_FILE):
-        return pd.read_csv(DATA_FILE)
+# 1. User Location Inputs (Default: Nairobi Center)
+st.sidebar.subheader("1. Your Current Location")
+user_lat = st.sidebar.number_input("Latitude", value=-1.286389, format="%.6f")
+user_lon = st.sidebar.number_input("Longitude", value=36.817223, format="%.6f")
+
+# 2. Travel Mode Selection
+st.sidebar.subheader("2. Mode of Transport")
+mode = st.sidebar.selectbox(
+    "Select Travel Mode",
+    ["Vehicle (Driving)", "Walking", "Cycling", "Airplane (Direct Flight)"]
+)
+
+mode_speeds = {
+    "Vehicle (Driving)": {"speed": 70, "gmaps_mode": "driving"},
+    "Walking": {"speed": 5, "gmaps_mode": "walking"},
+    "Cycling": {"speed": 15, "gmaps_mode": "bicycling"},
+    "Airplane (Direct Flight)": {"speed": 500, "gmaps_mode": "driving"}
+}
+
+# --- CALCULATE DISTANCES AND ETA ---
+df["Distance_km"] = df.apply(
+    lambda row: haversine_distance(user_lat, user_lon, row["lat"], row["lon"]), axis=1
+)
+
+speed = mode_speeds[mode]["speed"]
+df["ETA_hours"] = df["Distance_km"] / speed
+
+# Sort by nearest spot
+df = df.sort_values(by="Distance_km").reset_index(drop=True)
+
+# --- MAIN DASHBOARD LAYOUT ---
+col1, col2 = st.columns([1, 1.2])
+
+with col1:
+    st.subheader("🏁 Nearest Road Trip Spots")
     
-    # 20 Essential Kenya Road Trip Spots
-    initial_spots = [
-        # --- Corridor 1: Nairobi to Naivasha / Nakuru Highway ---
-        {"name": "Mai Mahiu Rift Valley Viewpoint", "category": "Scenic Viewpoint", "corridor": "Nairobi-Naivasha (A104)", "county": "Nakuru", "description": "Classic escarpment view overlooking Mt. Longonot and Mt. Suswa.", "lat": -1.0264, "lng": 36.5683, "vibe": "Quick Stop / Photos"},
-        {"name": "Old Italian Church", "category": "Cultural & Heritage", "corridor": "Nairobi-Naivasha (A104)", "county": "Nakuru", "description": "Historic smallest church built by Italian POWs in 1942.", "lat": -1.0345, "lng": 36.5741, "vibe": "Heritage & History"},
-        {"name": "Camp Carnelley's (Lazybones)", "category": "Hidden Eatery / Cafe", "corridor": "Nairobi-Naivasha (A104)", "county": "Nakuru", "description": "Boho lakeside restaurant and campsite on South Lake Road.", "lat": -0.8031, "lng": 36.3812, "vibe": "Chill / Lakeside Food"},
-        {"name": "Hell's Gate Fischer's Tower", "category": "Hiking & Outdoor", "corridor": "Nairobi-Naivasha (A104)", "county": "Nakuru", "description": "Volcanic plug popular for rock climbing and cycling alongside wildlife.", "lat": -0.8872, "lng": 36.3155, "vibe": "Adventure / Cycling"},
-        {"name": "Olkaria Geothermal Spa", "category": "Hot Springs & Chill", "corridor": "Nairobi-Naivasha (A104)", "county": "Nakuru", "description": "Naturally heated warm brine swimming pool inside Hell's Gate.", "lat": -0.8931, "lng": 36.2941, "vibe": "Relaxation / Wellness"},
-        {"name": "Sleeping Warrior & Ugali Hill", "category": "Hiking & Outdoor", "corridor": "Nairobi-Nakuru (A104)", "county": "Nakuru", "description": "Trail overlooking Lake Elementaita shaped like a resting Maasai warrior.", "lat": -0.4281, "lng": 36.2301, "vibe": "Hiking / Day Trip"},
-
-        # --- Corridor 2: Central Highlands / Nanyuki / Mt. Kenya ---
-        {"name": "Blue Post Waterfalls", "category": "Waterfall & Nature", "corridor": "Nairobi-Nanyuki (A2)", "county": "Kiambu", "description": "Classic stopover between Chania and Thika falls along the A2 highway.", "lat": -1.0331, "lng": 37.0691, "vibe": "Breakfast / River View"},
-        {"name": "Castle Forest Lodge", "category": "Hiking & Outdoor", "corridor": "Nairobi-Nanyuki (A2)", "county": "Kirinyaga", "description": "Deep forest retreat at the foot of Mt. Kenya with waterfalls.", "lat": -0.3791, "lng": 37.2881, "vibe": "Nature Walk / Quiet"},
-        {"name": "Trout Tree Restaurant", "category": "Hidden Eatery / Cafe", "corridor": "Nairobi-Nanyuki (A2)", "county": "Nyeri", "description": "Open-air restaurant built inside a huge fig tree over trout ponds.", "lat": -0.1102, "lng": 37.0392, "vibe": "Unique Dining"},
-        {"name": "Nanyuki Equator Marker", "category": "Cultural & Heritage", "corridor": "Nairobi-Nanyuki (A2)", "county": "Laikipia", "description": "Official equator line cross point with science demonstrations.", "lat": 0.0000, "lng": 37.0722, "vibe": "Quick Photo Stop"},
-        {"name": "Ngare Ndare Forest Canopy Walkway", "category": "Waterfall & Nature", "corridor": "Nanyuki-Timau (A2)", "county": "Meru", "description": "Turquoise blue waterfall pools and a 450m canopy walk.", "lat": 0.1781, "lng": 37.3821, "vibe": "Swimming / Canopy Walk"},
-
-        # --- Corridor 3: Rift Valley Escarpment / North Rift ---
-        {"name": "Iten Rim Viewpoint", "category": "Scenic Viewpoint", "corridor": "Eldoret-Iten (C51)", "county": "Elgeyo Marakwet", "description": "High-altitude cliff edge overlooking the Kerio Valley escarpment.", "lat": 0.6731, "lng": 35.5082, "vibe": "Panoramic Views"},
-        {"name": "Torok Waterfall", "category": "Waterfall & Nature", "corridor": "Eldoret-Iten (C51)", "county": "Elgeyo Marakwet", "description": "200-meter vertical waterfall cascading down the Elgeyo Escarpment.", "lat": 0.4351, "lng": 35.5391, "vibe": "Trekking / Hidden Gem"},
-        {"name": "Cheploch Gorge", "category": "Cultural & Heritage", "corridor": "Kabarnet Highway", "county": "Baringo", "description": "Deep rocky gorge on the Kerio River where local divers perform cliff jumps.", "lat": 0.5511, "lng": 35.6311, "vibe": "Sightseeing / Local Talent"},
-
-        # --- Corridor 4: Southern Rift & Kajiado / Magadi ---
-        {"name": "Champagne Ridge Viewpoint", "category": "Scenic Viewpoint", "corridor": "Kiserian-Magadi Road", "county": "Kajiado", "description": "Dramatic cliffside road trip location with views over the Rift Valley floor.", "lat": -1.5301, "lng": 36.6541, "vibe": "Sunset / Sundowner"},
-        {"name": "Olorgesailie Prehistoric Site", "category": "Cultural & Heritage", "corridor": "Kiserian-Magadi Road", "county": "Kajiado", "description": "World-famous handaxe archaeological site managed by NMK.", "lat": -1.5791, "lng": 36.4441, "vibe": "History & Museum"},
-        {"name": "Lake Magadi Hot Springs", "category": "Hot Springs & Chill", "corridor": "Kiserian-Magadi Road", "county": "Kajiado", "description": "Pink soda lake with natural hot water pools rich in minerals.", "lat": -1.8981, "lng": 36.2821, "vibe": "Off-Road / Adventure"},
-
-        # --- Corridor 5: Coastal Kenya / Malindi & South Coast ---
-        {"name": "Bofa Beach Hidden Cove", "category": "Beach & Water", "corridor": "Mombasa-Malindi (B8)", "county": "Kilifi", "description": "Uncrowded powder-white sand beach line with natural coral overhangs.", "lat": -3.6121, "lng": 39.8651, "vibe": "Beach / Chill"},
-        {"name": "Marafa Hell's Kitchen", "category": "Scenic Viewpoint", "corridor": "Malindi-Marafa", "county": "Kilifi", "description": "Canyon carved by erosion with vibrant red, orange, and white sandstone.", "lat": -3.0011, "lng": 39.9881, "vibe": "Sunset / Photography"},
-        {"name": "Kwale Kongo Mosque & River Mouth", "category": "Cultural & Heritage", "corridor": "Likoni-Diani (A14)", "county": "Kwale", "description": "Ancient 14th-century coral stone mosque where the estuary enters the ocean.", "lat": -4.2791, "lng": 39.5921, "vibe": "Sunset Kayaking"}
-    ]
-    df = pd.DataFrame(initial_spots)
-    df.to_csv(DATA_FILE, index=False)
-    return df
-
-df_spots = load_spots()
-
-# Sidebar - Route Filters
-st.sidebar.header("🛣️ Select Road Trip Corridor")
-corridor_list = ["All Corridors"] + list(df_spots["corridor"].unique())
-selected_corridor = st.sidebar.selectbox("Route / Highway", corridor_list)
-
-category_list = ["All Categories"] + list(df_spots["category"].unique())
-selected_category = st.sidebar.selectbox("Filter by Experience", category_list)
-
-# Filter Data
-filtered_df = df_spots.copy()
-if selected_corridor != "All Corridors":
-    filtered_df = filtered_df[filtered_df["corridor"] == selected_corridor]
-if selected_category != "All Categories":
-    filtered_df = filtered_df[filtered_df["category"] == selected_category]
-
-# Main Map Rendering
-col_map, col_list = st.columns([1.3, 0.7])
-
-with col_map:
-    st.subheader(f"Mapped Stops ({len(filtered_df)})")
+    selected_spot_name = st.selectbox("Select a spot for detailed route assist:", df["name"])
+    spot = df[df["name"] == selected_spot_name].iloc[0]
     
-    # Initialize Folium Map centered on Kenya
-    m = folium.Map(location=[0.0236, 37.9062], zoom_start=7, tiles="OpenStreetMap")
+    # SITE IMAGE DISPLAY
+    st.image(spot["image_url"], caption=f"Site View: {spot['name']}", use_column_width=True)
     
-    # Esri Satellite Layer
-    folium.TileLayer(
-        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Esri World Imagery",
-        name="Satellite Imagery"
+    st.markdown(f"**Category:** {spot['category']} | **Route Corridor:** {spot['route']}")
+    st.markdown(f"**County:** {spot['county']}")
+    
+    # Distance and ETA Card
+    st.metric(
+        label=f"Distance from Your Location ({mode})",
+        value=f"{spot['Distance_km']:.2f} km",
+        delta=f"~{spot['ETA_hours']*60:.0f} mins estimated" if spot['ETA_hours'] < 1 else f"~{spot['ETA_hours']:.1f} hrs estimated"
+    )
+    
+    # --- GOOGLE MAPS DIRECT LINK ---
+    gmaps_mode = mode_speeds[mode]["gmaps_mode"]
+    google_maps_url = (
+        f"https://www.google.com/maps/dir/?api=1"
+        f"&origin={user_lat},{user_lon}"
+        f"&destination={spot['lat']},{spot['lon']}"
+        f"&travelmode={gmaps_mode}"
+    )
+    
+    st.link_button("🚗 Open Live Turn-by-Turn Directions in Google Maps", google_maps_url)
+    
+    # --- IN-APP VOICE ASSISTANT ---
+    st.subheader("🔊 Voice Assistant")
+    voice_script = f"Navigating to {spot['name']} in {spot['county']} county. Distance is {spot['Distance_km']:.1f} kilometers via the {spot['route']} corridor. Estimated travel time by {mode} is approximately {spot['ETA_hours']*60:.0f} minutes."
+    
+    speech_html = f"""
+        <script>
+        function speakRoute() {{
+            var msg = new SpeechSynthesisUtterance();
+            msg.text = "{voice_script}";
+            msg.rate = 0.95;
+            window.speechSynthesis.speak(msg);
+        }}
+        </script>
+        <button onclick="speakRoute()" style="
+            background-color: #0E1117;
+            color: #FFFFFF;
+            border: 1px solid #4B5563;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;">
+            📢 Play Voice Navigation Brief
+        </button>
+    """
+    st.components.v1.html(speech_html, height=60)
+
+with col2:
+    st.subheader("🗺️ Live Route Map")
+    
+    # Initialize Map centered between user and selected spot
+    center_lat = (user_lat + spot["lat"]) / 2
+    center_lon = (user_lon + spot["lon"]) / 2
+    
+    m = folium.Map(location=[center_lat, center_lon], zoom_start=9, tiles="OpenStreetMap")
+    
+    # User Location Marker
+    folium.Marker(
+        location=[user_lat, user_lon],
+        popup="Your Location",
+        tooltip="Your Location",
+        icon=folium.Icon(color="red", icon="user", prefix="fa")
     ).add_to(m)
-
-    for idx, row in filtered_df.iterrows():
-        popup_content = f"""
-        <b>{row['name']}</b><br>
-        <i>{row['category']}</i><br>
-        <b>County:</b> {row['county']}<br>
-        <b>Vibe:</b> {row['vibe']}<br>
-        <p>{row['description']}</p>
-        """
-        folium.Marker(
-            location=[row["lat"], row["lng"]],
-            popup=folium.Popup(popup_content, max_width=250),
-            tooltip=row["name"],
-            icon=folium.Icon(color="red" if "Eatery" in row["category"] else "blue", icon="info-sign")
-        ).add_to(m)
-
-    folium.LayerControl().add_to(m)
-    st_folium(m, width="100%", height=550)
-
-with col_list:
-    st.subheader("Itinerary Spotlist")
-    for idx, row in filtered_df.iterrows():
-        with st.expander(f"📍 {row['name']} ({row['county']})"):
-            st.write(f"**Route:** {row['corridor']}")
-            st.write(f"**Vibe:** `{row['vibe']}`")
-            st.write(row['description'])
-            st.caption(f"Coordinates: {row['lat']}, {row['lng']}")
+    
+    # Destination Marker with HTML Image Popup inside Folium
+    popup_html = f"""
+        <div style="width:200px">
+            <b>{spot['name']}</b><br>
+            <img src="{spot['image_url']}" width="100%" style="border-radius:4px; margin-top:5px;"><br>
+            <small>{spot['category']} - {spot['county']}</small>
+        </div>
+    """
+    
+    folium.Marker(
+        location=[spot["lat"], spot["lon"]],
+        popup=folium.Popup(popup_html, max_width=220),
+        tooltip=spot["name"],
+        icon=folium.Icon(color="green", icon="star", prefix="fa")
+    ).add_to(m)
+    
+    # Direct Route Line
+    folium.PolyLine(
+        locations=[[user_lat, user_lon], [spot["lat"], spot["lon"]]],
+        color="blue",
+        weight=4,
+        opacity=0.7,
+        tooltip=f"Route to {spot['name']}"
+    ).add_to(m)
+    
+    st_folium(m, width="100%", height=500)
