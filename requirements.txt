@@ -2,3 +2,5 @@
 folium>=0.15.0
 streamlit-folium>=0.18.0
 pandas>=2.0.0
+streamlit
+streamlit-js-eval
