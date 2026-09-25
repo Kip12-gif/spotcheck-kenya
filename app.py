@@ -1,11 +1,11 @@
+import io
 import math
 import folium
 import pandas as pd
+from PIL import Image
 import streamlit as st
 from streamlit_folium import st_folium
 from streamlit_js_eval import get_geolocation
-from PIL import Image
-import io
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
@@ -39,10 +39,10 @@ st.markdown(
 
     /* Vibrant Safari Main Header */
     .hero-banner {
-        background: linear-gradient(115deg, #C2410C, #EA580C, #D97706);
-        padding: 24px;
+        background: linear-gradient(115deg, #9A3412, #EA580C, #B45309);
+        padding: 24px 28px;
         border-radius: 16px;
-        box-shadow: 0 8px 20px rgba(194, 65, 12, 0.25);
+        box-shadow: 0 8px 20px rgba(154, 52, 18, 0.22);
         color: white !important;
         margin-bottom: 20px;
     }
@@ -59,8 +59,28 @@ st.markdown(
         color: #FEF3C7 !important;
         font-size: 1.15rem;
         font-weight: 500;
-        margin-top: 5px;
+        margin-top: 6px;
         margin-bottom: 0;
+    }
+
+    /* Refined Color Bar Accent below Location Box */
+    .location-box {
+        background-color: #FFFFFF;
+        border-radius: 12px;
+        padding: 18px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+        border: 1px solid #E5E7EB;
+        position: relative;
+    }
+
+    .accent-bar {
+        height: 5px;
+        width: 100%;
+        background: linear-gradient(90deg, #EA580C 0%, #15803D 50%, #D97706 100%);
+        border-radius: 4px;
+        margin-top: 14px;
+        margin-bottom: 6px;
     }
 
     /* Cards & Containers */
@@ -74,14 +94,6 @@ st.markdown(
         margin-bottom: 16px;
         font-size: 0.98rem;
         line-height: 1.6;
-    }
-
-    .location-box {
-        background-color: #FEF3C7;
-        border: 2px dashed #D97706;
-        border-radius: 10px;
-        padding: 14px;
-        margin-bottom: 20px;
     }
 
     .badge-category {
@@ -247,7 +259,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- EXPLICIT GEOLOCATION PERMISSION SECTION ---
+# --- EXPLICIT GEOLOCATION PERMISSION SECTION & CLEAN ACCENT BAR ---
 with st.container():
     st.markdown('<div class="location-box">', unsafe_allow_html=True)
     st.subheader("📍 Origin & Live Distance Setup")
@@ -261,9 +273,7 @@ with st.container():
         )
 
         st.markdown("**Request Live GPS Location:**")
-        st.info("Click the button below to prompt your browser for location permission.")
 
-        # Interactive button triggering browser GPS access
         if st.button("📡 Detect My Current Location"):
             loc = get_geolocation()
             if loc and "coords" in loc:
@@ -283,6 +293,7 @@ with st.container():
             "Select Reference Town/City:",
             [
                 "Nairobi CBD (-1.2864, 36.8172)",
+                "Iten Town (0.6728, 35.5081)",
                 "Eldoret Town (0.5143, 35.2698)",
                 "Nakuru City (-0.3031, 36.0800)",
                 "Nanyuki Town (0.0167, 37.0728)",
@@ -293,6 +304,7 @@ with st.container():
         if st.button("Set Selected City as Origin"):
             coords_map = {
                 "Nairobi CBD (-1.2864, 36.8172)": (-1.286389, 36.817223),
+                "Iten Town (0.6728, 35.5081)": (0.6728, 35.5081),
                 "Eldoret Town (0.5143, 35.2698)": (0.5143, 35.2698),
                 "Nakuru City (-0.3031, 36.0800)": (-0.3031, 36.0800),
                 "Nanyuki Town (0.0167, 37.0728)": (0.0167, 37.0728),
@@ -305,6 +317,8 @@ with st.container():
             st.success(f"Origin set to {st.session_state['location_source']}")
             st.rerun()
 
+    # Sleek Solid Multi-Color Gradient Bar
+    st.markdown('<div class="accent-bar"></div>', unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 df_all = pd.DataFrame(st.session_state["spots_data"])
@@ -376,7 +390,6 @@ else:
         )
         spot = st.session_state["spots_data"][spot_idx]
 
-        # Calculate specific distance for selected spot
         spot_dist = haversine_distance(
             st.session_state["user_lat"],
             st.session_state["user_lon"],
@@ -428,7 +441,6 @@ else:
                 st.image(image, caption="Preview Upload", width=200)
 
                 if st.button("Save Photo to Spot"):
-                    # Save as PIL Image directly to session
                     st.session_state["spots_data"][spot_idx]["images"].append(
                         image
                     )
@@ -446,22 +458,44 @@ else:
             ),
         )
 
-        # Google Maps Navigation
+        # Google Maps Navigation Link
         gmaps_mode = mode_speeds[mode]["gmaps_mode"]
         gmaps_url = f"https://www.google.com/maps/dir/?api=1&origin={st.session_state['user_lat']},{st.session_state['user_lon']}&destination={spot['lat']},{spot['lon']}&travelmode={gmaps_mode}"
         st.link_button("🚗 Open Route in Google Maps", gmaps_url)
 
     with col2:
-        st.subheader("🗺️ Location & Navigation Map")
+        st.subheader("🗺️ Location & Multi-Layer Map")
 
         center_lat = (st.session_state["user_lat"] + spot["lat"]) / 2
         center_lon = (st.session_state["user_lon"] + spot["lon"]) / 2
 
+        # Initialize Base Map
         m = folium.Map(
             location=[center_lat, center_lon],
             zoom_start=8,
-            tiles="OpenStreetMap",
+            tiles=None,  # Handled by TileLayers below
         )
+
+        # --- MULTI-BASEMAP TILE LAYERS ---
+        folium.TileLayer(
+            tiles="OpenStreetMap",
+            name="Standard Street Map",
+            control=True,
+        ).add_to(m)
+
+        folium.TileLayer(
+            tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            attr="Esri World Imagery",
+            name="Esri Satellite Imagery",
+            control=True,
+        ).add_to(m)
+
+        folium.TileLayer(
+            tiles="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+            attr="OpenTopoMap",
+            name="Topographic Map",
+            control=True,
+        ).add_to(m)
 
         # Origin Marker
         folium.Marker(
@@ -470,12 +504,11 @@ else:
                 st.session_state["user_lon"],
             ],
             popup=f"Origin: {st.session_state['location_source']}",
-            tooltip="Origin",
+            tooltip="Origin Point",
             icon=folium.Icon(color="red", icon="user", prefix="fa"),
         ).add_to(m)
 
         # Destination Marker
-        cover_img = images[0] if images else ""
         popup_html = f"""
         <div style='width:220px;'>
             <b>{spot['name']}</b><br>
@@ -491,7 +524,7 @@ else:
             icon=folium.Icon(color="green", icon="star", prefix="fa"),
         ).add_to(m)
 
-        # Polyline connecting route
+        # Polyline Route Line
         folium.PolyLine(
             locations=[
                 [st.session_state["user_lat"], st.session_state["user_lon"]],
@@ -501,6 +534,9 @@ else:
             weight=4,
             opacity=0.85,
         ).add_to(m)
+
+        # Layer Control Widget on Top Right of Map
+        folium.LayerControl(position="topright", collapsed=False).add_to(m)
 
         st_folium(m, width="100%", height=520, returned_objects=[])
 
@@ -534,7 +570,6 @@ with tab1:
         else:
             st.write("No community tips posted for this spot yet.")
 
-        # Post Tip Form
         with st.form("add_tip_form", clear_on_submit=True):
             author_name = st.text_input(
                 "Your Name / Handle:", placeholder="e.g., Marathoner_Elgeyo"
